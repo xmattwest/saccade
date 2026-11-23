@@ -1,0 +1,38 @@
+{
+  "gate": "Gate C \u00b7 Apple M4 4-bit Unified Verification (Saccade v2.0)",
+  "backbone": "LiquidAI/d1-2B-MLX-4bit",
+  "loaded_adapters": [
+    "aftermath_tm",
+    "pointer_etl",
+    "quickjs_etl",
+    "reflex_v2",
+    "som_grounder"
+  ],
+  "memory_gib": {
+    "v1_dom_only_gib": 0.9857,
+    "v2_dom_only_gib": 0.9857,
+    "v2_full_vlm_gib": 1.3387,
+    "idle_unloaded_gib": 0.0
+  },
+  "single_pass_reflex_v2": {
+    "v1_two_pass_p50_ms": 1122.55,
+    "v2_single_pass_p50_ms": 908.44,
+    "reflex_speedup_x": 1.24,
+    "m4_answerable_top1_acc": 0.8346,
+    "m4_hazard_recall": 1.0,
+    "m4_benign_far": 0.0,
+    "m4_localhost_sandbox_allow_rate": 1.0
+  },
+  "som_visual_grounder": {
+    "v1_raw_box_screenspot_acc": 0.2067,
+    "m4_som_screenspot_100_acc": 0.85,
+    "som_p50_ms": 778.8
+  },
+  "pointer_read_etl": {
+    "generated_tokens": 0,
+    "pointer_p50_ms": 620.3,
+    "m4_field_exact_acc": 0.9607,
+    "m4_null_abstention_acc": 0.9701,
+    "m4_multi_field_card_exact_rate": 1.0
+  }
+}

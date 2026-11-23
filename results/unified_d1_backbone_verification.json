@@ -1,0 +1,27 @@
+{
+  "adapter": "d1_quickjs_etl",
+  "backbone": "LiquidAI/d1-2B-MLX-4bit",
+  "rank": 8,
+  "alpha": 16.0,
+  "dom_only_resident_gb": 2.061,
+  "full_vlm_resident_gb": 2.414,
+  "vision_page_in_ms": 28.31,
+  "test_n": 200,
+  "schema_json": {
+    "n": 106,
+    "json_parse_rate": 0.8396,
+    "schema_valid_rate": 0.8019,
+    "exact_value_match": 0.8019,
+    "median_infer_ms": 1045.59
+  },
+  "quickjs_code": {
+    "n": 94,
+    "valid_syntax_and_refs_rate": 1.0,
+    "zero_hallucinated_refs_rate": 1.0,
+    "median_infer_ms": 1172.72
+  },
+  "wall_clock_seconds": 1026.0,
+  "clean_sidecar_dom_only_gib": 0.986,
+  "clean_sidecar_full_vlm_gib": 1.339,
+  "clean_sidecar_idle_unloaded_gib": 0.0
+}

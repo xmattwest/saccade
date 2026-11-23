@@ -1,0 +1,42 @@
+{
+  "gate1_m4_baseline.json": {
+    "bytes": 4864,
+    "sha256": "e893477061e762f481a4a86ad055c1b58f4b039500176b0f1141723fafbcff1c"
+  },
+  "gate2_3_cuda_training.json": {
+    "bytes": 2699,
+    "sha256": "b2a69d03c5627f91f7bfa4d62445ec5dc3eb7ab6298b097d704ff3ff7394f82f"
+  },
+  "gate3_m4_adapted.json": {
+    "bytes": 4746,
+    "sha256": "acdcf0bf8d08d2ae612cd84fef00552f1ff8591bd11bb863ba9973fa8db8f82f"
+  },
+  "gate4_rust_ipc_verification.json": {
+    "bytes": 901,
+    "sha256": "3b6f10c1b10cdfd38f8304a52fce5e5902e4419f95153e1452e1a21d234963f0"
+  },
+  "gate5_e2e_summary.json": {
+    "bytes": 8589,
+    "sha256": "b1de84fccd13368360c3052e608e57227972f6ffc35f020e5b81f67c5ac58aaa"
+  },
+  "gate_b_v2_cuda_training.json": {
+    "bytes": 1949,
+    "sha256": "6b1e3b9f4fd60fae0f4d6d73297e291ca60c889c6944e84c0efa0271375cc8c3"
+  },
+  "gate_c_m4_v2_adapted.json": {
+    "bytes": 995,
+    "sha256": "d226850a579df69f9d17462c50a4a1f03ab841805d347f412dfda41779988ce5"
+  },
+  "live_browser_ab_telemetry.json": {
+    "bytes": 9235,
+    "sha256": "984179073e40ad44b8de7b5727b14b5fddb7c96650a65b86ef02bf1e14b966c4"
+  },
+  "live_browser_v2_comparison.json": {
+    "bytes": 17286,
+    "sha256": "c8edca74be6e83f7d23df9256ccbb0c6f817a0e6df944fdc65e0658ada42a7ac"
+  },
+  "unified_d1_backbone_verification.json": {
+    "bytes": 683,
+    "sha256": "b38f691d4612931a5a015e50b26df5344ac37e0ae120118f09654f089d0fe267"
+  }
+}

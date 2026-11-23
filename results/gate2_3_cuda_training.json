@@ -1,0 +1,116 @@
+{
+  "hardware": "NVIDIA GeForce RTX 4090",
+  "pinned_revisions": {
+    "d1_2b": "a6bce774e6dde338dcc3036ceb5d91f78bf4c19e",
+    "lfm3_1p7b": "1da06bec6a819da10b54c67e5c90972b46d81871"
+  },
+  "d1_dom_grounder": {
+    "adapter": "dom_grounder",
+    "rank": 8,
+    "alpha": 16.0,
+    "abstain_tau": 0.4,
+    "val_metrics": {
+      "answerable_top1_acc": 0.6557377049180327,
+      "cov_at_90p": 0.43283582089552236,
+      "best_tau": 0.4
+    },
+    "test_metrics_cuda": {
+      "answerable_top1_acc": 0.758893280632411,
+      "cov_at_90p": 0.48333333333333334,
+      "best_tau": 0.5
+    }
+  },
+  "d1_ui_box": {
+    "adapter": "ui_box",
+    "rank": 8,
+    "alpha": 16.0,
+    "val_metrics": {
+      "center_hit_acc": 0.2125,
+      "text_hit_acc": 0.25,
+      "icon_hit_acc": 0.175
+    },
+    "test_metrics_cuda": {
+      "center_hit_acc": 0.1867,
+      "text_hit_acc": 0.1856,
+      "icon_hit_acc": 0.188
+    }
+  },
+  "d1_handoff_guard": {
+    "adapter": "handoff_guard",
+    "rank": 8,
+    "alpha": 16.0,
+    "calibrated_temperature": 0.4,
+    "logit_bias": 0.6039,
+    "alert_tau": 0.0215,
+    "test_metrics_cuda": {
+      "auroc": 1.0,
+      "ap": 1.0,
+      "recall_at_val3far": 1.0,
+      "actual_benign_far": 0.0136
+    }
+  },
+  "d1_aftermath_tm": {
+    "adapter": "aftermath_tm",
+    "rank": 8,
+    "alpha": 16.0,
+    "time_machine_zero_label_chapters": [
+      {
+        "episode": 0,
+        "accuracy": 0.925,
+        "macro_f1": 0.9213
+      },
+      {
+        "episode": 60,
+        "gate": "PROMOTE",
+        "accuracy": 1.0,
+        "macro_f1": 1.0
+      },
+      {
+        "episode": 120,
+        "gate": "PROMOTE",
+        "accuracy": 1.0,
+        "macro_f1": 1.0
+      },
+      {
+        "episode": 180,
+        "gate": "PROMOTE",
+        "accuracy": 1.0,
+        "macro_f1": 1.0
+      },
+      {
+        "episode": 240,
+        "gate": "PROMOTE",
+        "accuracy": 1.0,
+        "macro_f1": 1.0
+      }
+    ],
+    "test_metrics_cuda": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0
+    }
+  },
+  "lfm3_quickjs_etl": {
+    "adapter": "lfm3_quickjs_etl",
+    "rank": 8,
+    "alpha": 16.0,
+    "base_val_metrics": {
+      "mean_nll": 0.6378,
+      "token_acc": 0.909,
+      "exact_sequence_rate": 0.0
+    },
+    "test_metrics_cuda": {
+      "mean_nll": 0.0079,
+      "token_acc": 0.9977,
+      "exact_sequence_rate": 0.9333
+    }
+  },
+  "peak_vram_gb": 4.2,
+  "wall_clock_seconds": 197.2,
+  "cloud_provenance": {
+    "image_digest": "runpod/pytorch@sha256:cb154fcca15d1d6ce858cfa672b76505e30861ef981d28ec94bd44168767d853",
+    "azure_exfil_prefix": "runs/saccade_20261123T004036Z",
+    "cost_per_hr_usd": 0.89,
+    "total_lease_seconds": 472.6,
+    "estimated_total_spend_usd": 0.1168
+  }
+}

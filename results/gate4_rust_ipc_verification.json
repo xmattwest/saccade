@@ -1,0 +1,34 @@
+{
+  "rust_binary": "saccade/rust-browse/target/release/browse",
+  "cli_tools_registered": true,
+  "live_sidecar_status": {
+    "ok": true,
+    "active_memory_gb": 2.319,
+    "registered_d1_adapters": [
+      "aftermath_tm",
+      "dom_grounder",
+      "handoff_guard",
+      "ui_box"
+    ],
+    "lfm3_loaded": true,
+    "time_machine_episodes": 0
+  },
+  "registered_d1_adapters": [
+    "aftermath_tm",
+    "dom_grounder",
+    "handoff_guard",
+    "ui_box"
+  ],
+  "unix_socket_ping_p50_ms": 0.07,
+  "unix_socket_ping_p95_ms": 0.44,
+  "live_rpc_checks": {
+    "foveate_pii_redacted": true,
+    "pick_ref_top_candidate": "e4",
+    "pick_ref_infer_ms": 604.06,
+    "firewall_benign_blocked": true,
+    "firewall_destructive_blocked": true,
+    "firewall_destructive_risk_prob": 0.9999,
+    "time_machine_recorded_surprise": 0.8
+  },
+  "graceful_fallback_when_sidecar_stopped": "stock_browse_passthrough"
+}

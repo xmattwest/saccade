@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Standalone Apple Silicon Saccade Unified Engine Launcher (`0.98 GiB` DOM / `1.34 GiB` VLM / `0.00 GiB` Idle).
+# Auto-spawned on demand by the Rust `browse` relay over Unix domain socket (`/tmp/saccade-lfm.sock`).
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SACCADE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SACCADE_DIR/.." && pwd)"
+
+SACCADE_HOME="${SACCADE_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/saccade}"
+SOCK_PATH="${SACCADE_SOCKET:-/tmp/saccade-lfm.sock}"
+ADAPTERS_DIR="${SACCADE_ADAPTERS_DIR:-$SACCADE_DIR/sidecar/adapters}"
+IDLE_SEC="${SACCADE_IDLE_UNLOAD_SECONDS:-600}"
+
+# 1. Prefer repo virtualenv when running from a source checkout; otherwise bootstrap standalone Apple Silicon runtime
+if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+  PY_BIN="$REPO_ROOT/.venv/bin/python"
+elif [ -x "$SACCADE_HOME/venv/bin/python" ]; then
+  PY_BIN="$SACCADE_HOME/venv/bin/python"
+else
+  mkdir -p "$SACCADE_HOME"
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "[saccade-engine] Installing uv for standalone Apple Silicon MLX runtime..." >&2
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
+  fi
+  echo "[saccade-engine] Bootstrapping standalone arm64 MLX environment in $SACCADE_HOME/venv..." >&2
+  uv venv --python 3.12 "$SACCADE_HOME/venv"
+  uv pip install --python "$SACCADE_HOME/venv/bin/python" "mlx>=0.22" "mlx-vlm>=0.3.12" "pillow>=10.0" "jsonschema>=4.20" "numpy>=1.26"
+  PY_BIN="$SACCADE_HOME/venv/bin/python"
+fi
+
+exec "$PY_BIN" "$SACCADE_DIR/sidecar/server.py" \
+  --socket "$SOCK_PATH" \
+  --adapters-dir "$ADAPTERS_DIR" \
+  --idle-unload-sec "$IDLE_SEC" \
+  "$@"

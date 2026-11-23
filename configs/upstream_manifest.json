@@ -1,0 +1,22 @@
+{
+  "project": "saccade",
+  "version": "0.1.0",
+  "upstream_browse": {
+    "repository": "https://github.com/anomalyco/browse",
+    "commit_sha": "4df7bce6a3f96a9fc100f21363206d05623bd43d",
+    "license": "MIT",
+    "vendored_path": "saccade/rust-browse"
+  },
+  "models": {
+    "d1_cuda_bf16": "LiquidAI/d1-2B",
+    "d1_mlx_4bit": "LiquidAI/d1-2B-MLX-4bit",
+    "lfm3_text": "LiquidAI/LFM3-1.7B"
+  },
+  "datasets": {
+    "dom_grounding": "osunlp/Multimodal-Mind2Web",
+    "ui_box_eval": "OS-Copilot/ScreenSpot-v2",
+    "ui_box_train": "agentsea/wave-ui-25k",
+    "schema_etl": "epfl-dlab/JSONSchemaBench",
+    "prompt_injection": "deepset/prompt-injections"
+  }
+}

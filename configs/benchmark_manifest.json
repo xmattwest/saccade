@@ -1,0 +1,75 @@
+{
+  "seed": 20261122,
+  "suites": {
+    "aftermath_test": {
+      "rel_path": "data/suites/aftermath/test.json",
+      "num_items": 200,
+      "sha256": "045577759fe0ffa111355e8fa238763b57dadd7ffe425284189a041f4a3c86a4"
+    },
+    "aftermath_train": {
+      "rel_path": "data/suites/aftermath/train.json",
+      "num_items": 600,
+      "sha256": "331dc8934c67882e9afa31d78ffa63cfb1b108741f91a098c73e7b9aaac41d43"
+    },
+    "aftermath_val": {
+      "rel_path": "data/suites/aftermath/val.json",
+      "num_items": 60,
+      "sha256": "8301de963fed4b5b86c688f9295a211656ada9d63664420a99d8fd030a72dfd0"
+    },
+    "dom_grounding_test": {
+      "rel_path": "data/suites/dom_grounding/test.json",
+      "num_items": 300,
+      "sha256": "e6b3f63a946b1981605bbea2db352380ef78d5a2c3b1dc51a221ad2b61d46016"
+    },
+    "dom_grounding_train": {
+      "rel_path": "data/suites/dom_grounding/train.json",
+      "num_items": 774,
+      "sha256": "f68b35e5df639f88841008f4ac7a1606846cd44992081de7f4ff123437a838e1"
+    },
+    "dom_grounding_val": {
+      "rel_path": "data/suites/dom_grounding/val.json",
+      "num_items": 67,
+      "sha256": "509d3d7d36dd9a8e522ecfbeeb8c243c34abb1ac885a19e289d5ae698d66b3b8"
+    },
+    "firewall_test": {
+      "rel_path": "data/suites/firewall/test.json",
+      "num_items": 300,
+      "sha256": "a372082115fa567d7ff1518d122b261b17c87fc0f4739e841e796fdb40330eb7"
+    },
+    "firewall_train": {
+      "rel_path": "data/suites/firewall/train.json",
+      "num_items": 900,
+      "sha256": "b3ed108e9a039089e06caa04d4bfba0f643969f355b7e31832c23bf3a37ff550"
+    },
+    "firewall_val": {
+      "rel_path": "data/suites/firewall/val.json",
+      "num_items": 80,
+      "sha256": "70bbafb17582ed116cc69605804375a1312514399bbcca8305fe1e29436e03ff"
+    },
+    "quickjs_etl_test": {
+      "rel_path": "data/suites/quickjs_etl/test.json",
+      "num_items": 200,
+      "sha256": "6b0e7ded818a05dc2a3a5a8846fd13b448d03f81408db61c51747af834e5a52d"
+    },
+    "quickjs_etl_train": {
+      "rel_path": "data/suites/quickjs_etl/train.json",
+      "num_items": 600,
+      "sha256": "5b91b64b0d3f33307236d003d918501dddd76078c30f87da7ee88310a6d41ea8"
+    },
+    "quickjs_etl_val": {
+      "rel_path": "data/suites/quickjs_etl/val.json",
+      "num_items": 60,
+      "sha256": "bd9df85b918b310f7f19952cf4d5f67c05b9a79fd97f9fef7fb6c808bdd91d6a"
+    },
+    "ui_box_test": {
+      "rel_path": "data/suites/ui_box/test.json",
+      "num_items": 300,
+      "sha256": "ccfcd659e586b8ed79fac2ebbf1667e5f3a1e775e5c9374ab71f7b10d48a120d"
+    },
+    "ui_box_val": {
+      "rel_path": "data/suites/ui_box/val.json",
+      "num_items": 80,
+      "sha256": "825b946fcf1b84ef9bb473136cf935492567bd802da9a8ecee51b0d1ad9ed83f"
+    }
+  }
+}

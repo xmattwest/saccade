@@ -1,0 +1,182 @@
+{
+  "mode": "adapted",
+  "hardware": "Apple M4 (16 GB unified memory, MLX 4-bit, 512 MB cache cap)",
+  "models": {
+    "d1": "LiquidAI/d1-2B-MLX-4bit",
+    "lfm3": "LiquidAI/LFM3-1.7B-MLX-4bit"
+  },
+  "memory_and_swap": {
+    "d1_resident_gb": 1.382,
+    "multi_lora_median_swap_ms": 0.1578,
+    "resident_active_gb": 2.319,
+    "peak_eval_gb": 1.717,
+    "wall_clock_seconds": 231.4
+  },
+  "dom_grounding": {
+    "n_test": 300,
+    "n_answerable": 253,
+    "n_unanswerable": 47,
+    "answerable_top1_acc": 0.7549,
+    "coverage_at_90pct_precision": 0.51,
+    "coverage_at_85pct_precision": 0.5933,
+    "foveation_mean_compression": 0.0629,
+    "foveation_target_retention": 0.8519,
+    "latency_p50_ms": 1092.78,
+    "latency_p95_ms": 1401.79,
+    "foveation_p50_ms": 1367.85,
+    "abstention_curve": [
+      {
+        "tau": 0.2,
+        "local_coverage": 0.68,
+        "local_precision": 0.8235,
+        "unanswerable_abstain_recall": 0.8085,
+        "hybrid_system_upper_bound": 0.88
+      },
+      {
+        "tau": 0.3,
+        "local_coverage": 0.5933,
+        "local_precision": 0.8652,
+        "unanswerable_abstain_recall": 0.8723,
+        "hybrid_system_upper_bound": 0.92
+      },
+      {
+        "tau": 0.4,
+        "local_coverage": 0.51,
+        "local_precision": 0.915,
+        "unanswerable_abstain_recall": 0.8936,
+        "hybrid_system_upper_bound": 0.9567
+      },
+      {
+        "tau": 0.5,
+        "local_coverage": 0.4567,
+        "local_precision": 0.927,
+        "unanswerable_abstain_recall": 0.8936,
+        "hybrid_system_upper_bound": 0.9667
+      },
+      {
+        "tau": 0.6,
+        "local_coverage": 0.4,
+        "local_precision": 0.95,
+        "unanswerable_abstain_recall": 0.9362,
+        "hybrid_system_upper_bound": 0.98
+      },
+      {
+        "tau": 0.7,
+        "local_coverage": 0.3133,
+        "local_precision": 0.9681,
+        "unanswerable_abstain_recall": 0.9787,
+        "hybrid_system_upper_bound": 0.99
+      },
+      {
+        "tau": 0.8,
+        "local_coverage": 0.2333,
+        "local_precision": 1.0,
+        "unanswerable_abstain_recall": 1.0,
+        "hybrid_system_upper_bound": 1.0
+      },
+      {
+        "tau": 0.85,
+        "local_coverage": 0.2,
+        "local_precision": 1.0,
+        "unanswerable_abstain_recall": 1.0,
+        "hybrid_system_upper_bound": 1.0
+      }
+    ]
+  },
+  "ui_box": {
+    "n_test": 300,
+    "center_hit_acc": 0.2067,
+    "web_center_hit_acc": 0.1609,
+    "text_target_hit_acc": 0.2096,
+    "icon_target_hit_acc": 0.203,
+    "mean_iou": 0.0486,
+    "iou_ge_0p3": 0.0733,
+    "latency_p50_ms": 496.36,
+    "latency_p95_ms": 561.07
+  },
+  "firewall": {
+    "n_test": 300,
+    "auroc": 1.0,
+    "average_precision": 1.0,
+    "default_0p50": {
+      "tau": 0.5,
+      "hazard_recall": 1.0,
+      "destructive_recall": 1.0,
+      "injection_recall": 1.0,
+      "benign_false_handoff_rate": 0.0
+    },
+    "calibrated_3pct_far": {
+      "tau": 0.0217,
+      "hazard_recall": 1.0,
+      "destructive_recall": 1.0,
+      "injection_recall": 1.0,
+      "benign_false_handoff_rate": 0.0136
+    },
+    "operating_curve": [
+      {
+        "tau": 0.3,
+        "hazard_recall": 1.0,
+        "destructive_recall": 1.0,
+        "injection_recall": 1.0,
+        "benign_false_handoff_rate": 0.0
+      },
+      {
+        "tau": 0.5,
+        "hazard_recall": 1.0,
+        "destructive_recall": 1.0,
+        "injection_recall": 1.0,
+        "benign_false_handoff_rate": 0.0
+      },
+      {
+        "tau": 0.7,
+        "hazard_recall": 1.0,
+        "destructive_recall": 1.0,
+        "injection_recall": 1.0,
+        "benign_false_handoff_rate": 0.0
+      },
+      {
+        "tau": 0.0217,
+        "hazard_recall": 1.0,
+        "destructive_recall": 1.0,
+        "injection_recall": 1.0,
+        "benign_false_handoff_rate": 0.0136
+      }
+    ],
+    "latency_p50_ms": 990.92,
+    "latency_p95_ms": 1194.98
+  },
+  "aftermath": {
+    "n_test": 200,
+    "accuracy": 1.0,
+    "macro_f1": 1.0,
+    "per_class_recall": {
+      "SETTLED_OK": 1.0,
+      "SPINNER_LOADING": 1.0,
+      "INLINE_ERROR_TOAST": 1.0,
+      "AUTH_OR_BOT_WALL": 1.0
+    },
+    "latency_p50_ms": 598.52,
+    "latency_p95_ms": 690.8
+  },
+  "quickjs_etl": {
+    "n_test": 200,
+    "schema_json": {
+      "n": 106,
+      "json_parse_rate": 0.9245,
+      "schema_valid_rate": 0.9151,
+      "exact_value_match": 0.9245,
+      "latency_p50_ms": 1027.59,
+      "latency_p95_ms": 1700.79
+    },
+    "quickjs_code": {
+      "n": 94,
+      "valid_syntax_and_refs_rate": 1.0,
+      "zero_hallucinated_refs_rate": 1.0,
+      "all_required_refs_copied_rate": 1.0,
+      "all_literals_preserved_rate": 1.0,
+      "latency_p50_ms": 1169.58,
+      "latency_p95_ms": 1263.12
+    },
+    "combined_pass_rate": 0.955
+  }
+}

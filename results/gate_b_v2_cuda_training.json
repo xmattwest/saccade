@@ -1,0 +1,71 @@
+{
+  "version": "2.0",
+  "hardware": "NVIDIA GeForce RTX 4090",
+  "pinned_revision": "a6bce774e6dde338dcc3036ceb5d91f78bf4c19e",
+  "d1_reflex_v2": {
+    "adapter": "reflex_v2",
+    "rank": 8,
+    "alpha": 16.0,
+    "abstain_tau": 0.75,
+    "alert_tau": 0.4,
+    "zero_shot_test": {
+      "answerable_top1_acc": 0.6262,
+      "coverage_at_90pct_precision": 0.4167,
+      "abstain_tau": 0.75,
+      "firewall_auroc": 0.9964,
+      "hazard_recall_at_0p40": 0.98,
+      "benign_far_at_0p40": 0.0387,
+      "localhost_sandbox_allow_rate": 1.0
+    },
+    "adapted_test": {
+      "answerable_top1_acc": 0.7607,
+      "coverage_at_90pct_precision": 0.6667,
+      "abstain_tau": 0.75,
+      "firewall_auroc": 1.0,
+      "hazard_recall_at_0p40": 1.0,
+      "benign_far_at_0p40": 0.0,
+      "localhost_sandbox_allow_rate": 1.0
+    }
+  },
+  "d1_som_grounder": {
+    "adapter": "som_grounder",
+    "rank": 8,
+    "alpha": 16.0,
+    "abstain_tau": 0.3,
+    "v1_raw_box_screenspot_acc": 0.2067,
+    "zero_shot_som_test": {
+      "som_badge_acc": 0.5333,
+      "som_web_acc": 0.5217,
+      "som_icon_acc": 0.0
+    },
+    "adapted_som_test": {
+      "som_badge_acc": 0.8767,
+      "som_web_acc": 0.887,
+      "som_icon_acc": 0.0
+    }
+  },
+  "d1_pointer_etl": {
+    "adapter": "pointer_etl",
+    "rank": 8,
+    "alpha": 16.0,
+    "zero_shot_test": {
+      "field_exact_acc": 0.9297,
+      "null_abstention_acc": 0.901,
+      "multi_field_card_exact_rate": 1.0
+    },
+    "adapted_test": {
+      "field_exact_acc": 0.9156,
+      "null_abstention_acc": 0.9703,
+      "multi_field_card_exact_rate": 1.0
+    }
+  },
+  "peak_vram_gb": 5.12,
+  "wall_clock_seconds": 554.5,
+  "cloud_provenance": {
+    "image_digest": "runpod/pytorch@sha256:cb154fcca15d1d6ce858cfa672b76505e30861ef981d28ec94bd44168767d853",
+    "azure_exfil_prefix": "runs/saccade_20261123T025308Z",
+    "cost_per_hr_usd": 0.89,
+    "total_lease_seconds": 658.6,
+    "estimated_total_spend_usd": 0.1628
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "about": "Pinned container image digest, upstream Rust fork commit, and exact 40-char Hugging Face model revisions for Project Saccade.",
+  "pinned_on": "2026-11-22",
+  "upstream_browse": {
+    "repo": "https://github.com/anomalyco/browse",
+    "revision": "4df7bce6a3f96a9fc100f21363206d05623bd43d",
+    "license": "MIT"
+  },
+  "cuda_training_image": {
+    "tag": "runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04",
+    "index_digest": "sha256:cb154fcca15d1d6ce858cfa672b76505e30861ef981d28ec94bd44168767d853"
+  },
+  "acr_slim_reference": {
+    "repo": "${AFRIAT_ACR_HOST}/afriat-gpu",
+    "digest": "sha256:9f4a64ef696325441dee5e7b7be69610911f511245828c7e40bd92fccaf2bb3a"
+  },
+  "models": [
+    {
+      "name": "d1-2b-bf16",
+      "repo": "LiquidAI/d1-2B",
+      "revision": "a6bce774e6dde338dcc3036ceb5d91f78bf4c19e",
+      "role": "CUDA BF16 base backbone for 4 Saccade decision/box/firewall/aftermath LoRAs"
+    },
+    {
+      "name": "d1-2b-mlx-4bit",
+      "repo": "LiquidAI/d1-2B-MLX-4bit",
+      "revision": "afeb4a3141bf4040cbc312d0ccc14eac719024c5",
+      "role": "Resident Apple Silicon 4-bit MLX decision & visual grounding backbone"
+    },
+    {
+      "name": "lfm3-1.7b-bf16",
+      "repo": "LiquidAI/LFM3-1.7B",
+      "revision": "1da06bec6a819da10b54c67e5c90972b46d81871",
+      "role": "CUDA BF16 base backbone for QuickJS & JSONSchema SFT+GRPO LoRA"
+    },
+    {
+      "name": "lfm3-1.7b-mlx-4bit",
+      "repo": "LiquidAI/LFM3-1.7B-MLX-4bit",
+      "revision": "91f34088d6946482cbcae11b85d4657093618c34",
+      "role": "Resident Apple Silicon 4-bit MLX QuickJS & JSONSchema scripter"
+    }
+  ]
+}
