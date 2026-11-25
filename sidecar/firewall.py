@@ -6,8 +6,12 @@ from typing import Any
 
 from PIL import Image
 
-from .foveate import fast_foveate_snapshot
-from .multi_lora import ResidentD1MultiLoRA
+try:
+    from .foveate import fast_foveate_snapshot
+    from .multi_lora import ResidentD1MultiLoRA
+except ImportError:
+    from foveate import fast_foveate_snapshot
+    from multi_lora import ResidentD1MultiLoRA
 
 
 DESTRUCTIVE_QUESTION = {

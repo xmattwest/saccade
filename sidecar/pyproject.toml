@@ -1,0 +1,14 @@
+[project]
+name = "saccade-sidecar"
+version = "0.2.0"
+description = "Standalone Apple Silicon MLX sidecar runtime for Project Saccade on LiquidAI/d1-2B"
+requires-python = ">=3.12"
+dependencies = [
+    "mlx>=0.25",
+    "mlx-lm>=0.32.2",
+    "mlx-vlm>=0.7.11",
+    "huggingface_hub>=0.30",
+    "pillow>=10.0",
+    "jsonschema>=4.20",
+    "numpy>=1.26",
+]

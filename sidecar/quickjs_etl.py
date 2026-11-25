@@ -21,8 +21,12 @@ from typing import Any
 import jsonschema
 import mlx.core as mx
 
-from lfm_tinker.lora_d1 import inject_tri_hybrid_lora, iter_lora_modules
-from .multi_lora import ResidentD1MultiLoRA, normalize_lora_key_to_mlx
+try:
+    from .lora_d1 import inject_tri_hybrid_lora, iter_lora_modules
+    from .multi_lora import ResidentD1MultiLoRA, normalize_lora_key_to_mlx
+except ImportError:
+    from lora_d1 import inject_tri_hybrid_lora, iter_lora_modules
+    from multi_lora import ResidentD1MultiLoRA, normalize_lora_key_to_mlx
 
 CODE_FENCE_RE = re.compile(r"```(?:javascript|js|json)?\s*([\s\S]*?)```", re.IGNORECASE)
 QUICKJS_FORBIDDEN = ("require(", "process.", "import ", "fetch(", "child_process", "fs.")

@@ -35,11 +35,17 @@ fn choose(choice: Option<&str>, client: &str) -> Surface {
 
 /// The tools a client sees; `client` None (the CLI, a health check) sees them all.
 pub fn tools(client: Option<&str>, specs: Vec<ToolSpec>) -> Vec<ToolSpec> {
-    match client.map(for_client).unwrap_or(Surface::All) {
+    let mut selected: Vec<ToolSpec> = match client.map(for_client).unwrap_or(Surface::All) {
         Surface::All => specs,
         Surface::Plain => specs.into_iter().filter(|s| s.name != EXECUTE).collect(),
         Surface::Execute => EXECUTE_SURFACE.iter().filter_map(|name| specs.iter().find(|s| s.name == *name).cloned()).collect(),
+    };
+    for spec in &mut selected {
+        if spec.name == EXECUTE {
+            crate::saccade::augment_execute_spec(spec);
+        }
     }
+    selected
 }
 
 /// The MCP server instructions for a client.

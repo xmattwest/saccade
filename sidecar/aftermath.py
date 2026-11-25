@@ -8,7 +8,10 @@ from typing import Any
 
 from PIL import Image
 
-from .multi_lora import ResidentD1MultiLoRA
+try:
+    from .multi_lora import ResidentD1MultiLoRA
+except ImportError:
+    from multi_lora import ResidentD1MultiLoRA
 
 AFTERMATH_CRITERIA = {
     "SETTLED_OK": "The UI updated cleanly and is ready for the next step (new view, opened menu/modal, or filled field)",

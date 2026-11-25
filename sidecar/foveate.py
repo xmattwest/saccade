@@ -8,11 +8,15 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from .multi_lora import ResidentD1MultiLoRA
+try:
+    from .multi_lora import ResidentD1MultiLoRA
+except ImportError:
+    from multi_lora import ResidentD1MultiLoRA
 
 REF_RE = re.compile(r"\[ref=(e\d+)\b([^\]]*)\]")
 LINE_RE = re.compile(r'^(?P<indent>\s*)-\s+(?P<role>[a-zA-Z0-9_-]+)(?:\s+"(?P<name>(?:\\.|[^"])*)")?')
 WORD_RE = re.compile(r"[a-z0-9]{2,}")
+NAV_INTENT_RE = re.compile(r"\b(?:nav|navigation|navbar|header|menu|topbar)\b", re.IGNORECASE)
 
 STOPWORDS = {
     "the", "and", "for", "with", "from", "into", "that", "this", "click", "press", "select",
@@ -21,6 +25,7 @@ STOPWORDS = {
 }
 
 BOILERPLATE_ROLES = {"banner", "contentinfo", "complementary", "navigation"}
+NAV_ROLES = {"banner", "navigation"}
 PRIORITY_ROLES = {"dialog", "alertdialog", "alert", "main", "form", "table", "region"}
 
 PII_PATTERNS = [
@@ -151,6 +156,7 @@ def fast_foveate_snapshot(
         }
 
     q_terms = list(dict.fromkeys(_stem_tokens(subgoal)))
+    wants_nav = bool(NAV_INTENT_RE.search(subgoal))
     doc_tokens = [_stem_tokens("\n".join(s.lines)) for s in sections]
     n_docs = len(sections)
     avgdl = max(1.0, sum(len(dt) for dt in doc_tokens) / n_docs)
@@ -174,6 +180,8 @@ def fast_foveate_snapshot(
             role_bonus += 1.35
         elif sec.role in PRIORITY_ROLES:
             role_bonus += 0.95
+        elif wants_nav and sec.role in NAV_ROLES:
+            role_bonus += 0.65
         elif sec.role in BOILERPLATE_ROLES and bm25 < 0.8:
             role_bonus -= 1.20
         if sec.refs:

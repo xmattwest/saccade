@@ -1,0 +1,7 @@
+rust-browse/target/
+.venv/
+sidecar/adapters/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store

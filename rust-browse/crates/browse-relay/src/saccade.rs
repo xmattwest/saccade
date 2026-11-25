@@ -91,6 +91,102 @@ pub fn find_engine_launcher() -> Option<PathBuf> {
     None
 }
 
+const DEFAULT_SPAWN_TIMEOUT_SEC: u64 = 45;
+
+fn parse_spawn_timeout_secs(raw: Option<&str>) -> u64 {
+    raw.and_then(|s| s.trim().parse::<u64>().ok())
+        .filter(|&secs| secs > 0)
+        .unwrap_or(DEFAULT_SPAWN_TIMEOUT_SEC)
+}
+
+fn spawn_timeout_secs() -> u64 {
+    parse_spawn_timeout_secs(std::env::var("SACCADE_SPAWN_TIMEOUT_SEC").ok().as_deref())
+}
+
+fn engine_log_path() -> PathBuf {
+    std::env::temp_dir().join("saccade-engine.log")
+}
+
+fn read_log_tail(path: &Path, max_lines: usize) -> String {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return String::new();
+    };
+    let lines: Vec<&str> = content
+        .lines()
+        .map(str::trim_end)
+        .filter(|l| !l.trim().is_empty())
+        .collect();
+    if lines.is_empty() {
+        return String::new();
+    }
+    let start = lines.len().saturating_sub(max_lines);
+    lines[start..].join("\n")
+}
+
+async fn spawn_engine_and_wait(launcher: &Path, sock: &Path, log_path: &Path, timeout_secs: u64) -> Result<()> {
+    let stderr_stdio = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(log_path)
+        .map(Stdio::from)
+        .unwrap_or_else(|_| Stdio::null());
+
+    let mut cmd = std::process::Command::new(launcher);
+    cmd.env("SACCADE_SOCKET", sock)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(stderr_stdio);
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    let mut child = cmd
+        .spawn()
+        .with_context(|| format!("Failed to spawn Saccade engine at {}", launcher.display()))?;
+
+    let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+    while Instant::now() < deadline {
+        if UnixStream::connect(sock).await.is_ok() {
+            return Ok(());
+        }
+        if let Ok(Some(status)) = child.try_wait() {
+            if UnixStream::connect(sock).await.is_ok() {
+                return Ok(());
+            }
+            let tail = read_log_tail(log_path, 20);
+            if tail.is_empty() {
+                anyhow::bail!(
+                    "Spawned `saccade-engine` exited early with {status} before socket {} became ready (see {})",
+                    sock.display(),
+                    log_path.display()
+                );
+            }
+            anyhow::bail!(
+                "Spawned `saccade-engine` exited early with {status} before socket {} became ready (last lines of {}):\n{tail}",
+                sock.display(),
+                log_path.display()
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(60)).await;
+    }
+
+    let tail = read_log_tail(log_path, 20);
+    if tail.is_empty() {
+        anyhow::bail!(
+            "Spawned `saccade-engine` but socket {} did not become ready within {timeout_secs}s (see {})",
+            sock.display(),
+            log_path.display()
+        );
+    }
+    anyhow::bail!(
+        "Spawned `saccade-engine` but socket {} did not become ready within {timeout_secs}s (last lines of {}):\n{tail}",
+        sock.display(),
+        log_path.display()
+    )
+}
+
 async fn try_autospawn_sidecar(sock: &Path) -> Result<()> {
     if !autostart_enabled() {
         anyhow::bail!("Saccade autostart disabled via SACCADE_AUTOSTART=0");
@@ -104,27 +200,9 @@ async fn try_autospawn_sidecar(sock: &Path) -> Result<()> {
     let launcher = find_engine_launcher()
         .ok_or_else(|| anyhow!("No `saccade-engine` launcher found; start sidecar manually or set SACCADE_ENGINE_BIN"))?;
 
-    let mut cmd = std::process::Command::new(&launcher);
-    cmd.env("SACCADE_SOCKET", sock)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
-    }
-    cmd.spawn()
-        .with_context(|| format!("Failed to spawn Saccade engine at {}", launcher.display()))?;
-
-    let deadline = Instant::now() + Duration::from_secs(12);
-    while Instant::now() < deadline {
-        if UnixStream::connect(sock).await.is_ok() {
-            return Ok(());
-        }
-        tokio::time::sleep(Duration::from_millis(60)).await;
-    }
-    anyhow::bail!("Spawned `saccade-engine` but socket {} did not become ready within 12s", sock.display())
+    let log_path = engine_log_path();
+    let timeout_secs = spawn_timeout_secs();
+    spawn_engine_and_wait(&launcher, sock, &log_path, timeout_secs).await
 }
 
 /// Send one NDJSON request to the local Saccade LFM sidecar over Unix domain socket, auto-spawning on demand if configured.
@@ -388,6 +466,17 @@ fn count_refs_in_lines(lines: &[String]) -> usize {
     lines.iter().map(|l| l.matches("[ref=e").count()).sum()
 }
 
+fn subgoal_targets_nav(subgoal: &str) -> bool {
+    subgoal
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .any(|w| {
+            matches!(
+                w.to_ascii_lowercase().as_str(),
+                "nav" | "navigation" | "navbar" | "header" | "menu" | "topbar"
+            )
+        })
+}
+
 /// Deterministic `< 0.5 ms` Rust BM25 ARIA-subtree pruner + PII redactor (`0` LLM calls).
 pub fn fast_foveate_rust(snapshot_text: &str, subgoal: &str, redact_pii: bool) -> FoveatedOutput {
     let t0 = Instant::now();
@@ -476,6 +565,7 @@ pub fn fast_foveate_rust(snapshot_text: &str, subgoal: &str, redact_pii: bool) -
         df.insert(qt.clone(), count);
     }
 
+    let wants_nav = subgoal_targets_nav(subgoal);
     let mut scores: Vec<(usize, f64)> = Vec::with_capacity(sections_total);
     for (idx, (sec, dtoks)) in sections.iter().zip(doc_toks.iter()).enumerate() {
         let mut tf_map: HashMap<&str, usize> = HashMap::new();
@@ -496,6 +586,8 @@ pub fn fast_foveate_rust(snapshot_text: &str, subgoal: &str, redact_pii: bool) -
         if sec.role == "main" {
             bonus += 1.35;
         } else if matches!(sec.role.as_str(), "dialog" | "alertdialog" | "alert" | "form" | "table" | "region") {
+            bonus += 0.95;
+        } else if wants_nav && matches!(sec.role.as_str(), "navigation" | "banner") {
             bonus += 0.95;
         } else if matches!(sec.role.as_str(), "banner" | "contentinfo" | "complementary" | "navigation") && bm25 < 0.8 {
             bonus -= 1.20;
@@ -653,7 +745,32 @@ async fn current_tab_url(ctx: &ToolContext, tab: TabId) -> String {
     String::new()
 }
 
-/// Transparent decorator adding `< 0.5 ms` Rust BM25 Foveation + PII masking to `snapshot` and Pre-CDP Handoff Firewall to mutating tools.
+const EXECUTE_ROUTING_HEADER: &str = "Saccade Fast-Path Routing:";
+const EXECUTE_ROUTING_BLOCK: &str = "\
+Saccade Fast-Path Routing:
+- Prefer `saccade_act` for single clicks, link navigations, toggles, and form fills (runs locally in 1 pass with 0 cloud DOM tokens; pass `visualFallback: true` for `<canvas>` or unlabeled `<svg>` icons).
+- Prefer `saccade_extract` for structured table/card JSON extraction, and `saccade_sweep` for multi-page paginated tables.
+- Use `execute` for `page.goto(...)`, multi-step JS workflows, or escalations, and ALWAYS pass `{ subgoal: \"...\" }` to `browse.snapshot({ subgoal })` inside `execute` so Saccade's `< 0.5 ms` BM25 foveator prunes 75 to 85% of boilerplate DOM tokens.";
+
+fn augment_execute_description_if(description: &str, enabled: bool) -> String {
+    if !enabled || description.contains(EXECUTE_ROUTING_HEADER) {
+        return description.to_string();
+    }
+    if description.trim().is_empty() {
+        EXECUTE_ROUTING_BLOCK.to_string()
+    } else {
+        format!("{EXECUTE_ROUTING_BLOCK}\n\n{description}")
+    }
+}
+
+/// Prepend Saccade Fast-Path Routing guidance to `execute`'s MCP `ToolSpec` description when the sidecar is enabled.
+pub fn augment_execute_spec(spec: &mut ToolSpec) {
+    if spec.name == "execute" {
+        spec.description = augment_execute_description_if(&spec.description, !sidecar_disabled());
+    }
+}
+
+/// Transparent decorator adding `< 0.5 ms` Rust BM25 Foveation + PII masking to `snapshot`, Saccade Fast-Path Routing guidance to `execute`, and Pre-CDP Handoff Firewall to mutating tools.
 pub struct SaccadeMiddlewareTool {
     inner: Arc<dyn Tool>,
 }
@@ -664,7 +781,7 @@ impl SaccadeMiddlewareTool {
             .into_iter()
             .map(|tool| {
                 let name = tool.spec().name;
-                if name == "snapshot" || GUARDED_INPUT_TOOLS.contains(&name.as_str()) {
+                if name == "snapshot" || name == "execute" || GUARDED_INPUT_TOOLS.contains(&name.as_str()) {
                     Arc::new(Self { inner: tool }) as Arc<dyn Tool>
                 } else {
                     tool
@@ -678,6 +795,9 @@ impl SaccadeMiddlewareTool {
 impl Tool for SaccadeMiddlewareTool {
     fn spec(&self) -> ToolSpec {
         let mut spec = self.inner.spec();
+        if spec.name == "execute" {
+            augment_execute_spec(&mut spec);
+        }
         if spec.name == "snapshot"
             && let Some(props) = spec.input_schema.get_mut("properties").and_then(Value::as_object_mut)
         {
@@ -712,6 +832,9 @@ impl Tool for SaccadeMiddlewareTool {
 
     async fn call(&self, ctx: ToolContext, mut args: Value) -> Result<ToolOutput> {
         let name = self.inner.spec().name;
+        if name == "execute" {
+            return self.inner.call(ctx, args).await;
+        }
         let tab = args.get("tab").and_then(|v| ctx.browser.resolve_tab(v).ok());
 
         if name == "snapshot" {
@@ -1470,10 +1593,9 @@ pub fn attach_saccade_tools(base_tools: Vec<Arc<dyn Tool>>) -> Vec<Arc<dyn Tool>
 mod tests {
     use super::*;
     use browse_core::{Browser, Cdp, HandoffResult, TabInfo, TabOptions, TabState};
-    use std::sync::Mutex as StdMutex;
     use tokio::net::UnixListener;
 
-    static ENV_LOCK: StdMutex<()> = StdMutex::new(());
+    static ENV_LOCK: OnceLock<AsyncMutex<()>> = OnceLock::new();
 
     struct DummyBrowser {
         state: Arc<TabState>,
@@ -1621,14 +1743,12 @@ mod tests {
         let attached = attach_saccade_tools(base);
         let by_name: HashMap<String, Arc<dyn Tool>> = attached.into_iter().map(|t| (t.spec().name, t)).collect();
 
-        {
-            let _guard = ENV_LOCK.lock().unwrap();
-            unsafe {
-                std::env::set_var("SACCADE_SOCKET", &sock);
-                std::env::set_var("SACCADE_AUTOSTART", "0");
-                std::env::remove_var("SACCADE_DISABLE");
-                std::env::remove_var("SACCADE_NEURAL_FOVEATE");
-            }
+        let _env_guard = ENV_LOCK.get_or_init(|| AsyncMutex::new(())).lock().await;
+        unsafe {
+            std::env::set_var("SACCADE_SOCKET", &sock);
+            std::env::set_var("SACCADE_AUTOSTART", "0");
+            std::env::remove_var("SACCADE_DISABLE");
+            std::env::remove_var("SACCADE_NEURAL_FOVEATE");
         }
 
         let ctx_cancel = ToolContext {
@@ -1735,13 +1855,11 @@ mod tests {
         let attached = attach_saccade_tools(base);
         let by_name: HashMap<String, Arc<dyn Tool>> = attached.into_iter().map(|t| (t.spec().name, t)).collect();
 
-        {
-            let _guard = ENV_LOCK.lock().unwrap();
-            unsafe {
-                std::env::set_var("SACCADE_SOCKET", &sock);
-                std::env::set_var("SACCADE_AUTOSTART", "0");
-                std::env::remove_var("SACCADE_DISABLE");
-            }
+        let _env_guard = ENV_LOCK.get_or_init(|| AsyncMutex::new(())).lock().await;
+        unsafe {
+            std::env::set_var("SACCADE_SOCKET", &sock);
+            std::env::set_var("SACCADE_AUTOSTART", "0");
+            std::env::remove_var("SACCADE_DISABLE");
         }
 
         let ctx = ToolContext {
@@ -1760,5 +1878,124 @@ mod tests {
         assert_eq!(sw["data"]["invoices"].as_array().unwrap().len(), 4);
 
         let _ = std::fs::remove_file(&sock);
+    }
+
+    #[test]
+    fn rust_bm25_foveator_retains_top_nav_when_subgoal_targets_navigation() {
+        let mut big = String::from("- navigation \"Top Nav\":\n");
+        big.push_str("  - link \"Home\" [ref=e1]\n");
+        big.push_str("  - link \"Research\" [ref=e2]\n");
+        big.push_str("  - link \"Publications\" [ref=e12]\n");
+        for i in 13..=35 {
+            big.push_str(&format!("  - link \"Section Link {i}\" [ref=e{i}]\n"));
+        }
+        big.push_str("- main \"Institute Overview\":\n");
+        for i in 1..=60 {
+            big.push_str(&format!(
+                "  - paragraph \"Featured project summary {i} covering systems benchmarks, compiler passes, and runtime profiles.\"\n"
+            ));
+        }
+        big.push_str("- region \"Upcoming Seminars\":\n");
+        for i in 1..=35 {
+            big.push_str(&format!("  - link \"Seminar Series Talk {i}\" [ref=e{}]\n", 200 + i));
+        }
+        big.push_str("- form \"Newsletter Signup\":\n");
+        for i in 1..=20 {
+            big.push_str(&format!("  - textbox \"Field {i}\" [ref=e{}]\n", 300 + i));
+        }
+        big.push_str("- contentinfo \"Footer\":\n");
+        for i in 1..=45 {
+            big.push_str(&format!("  - link \"Footer Legal Policy {i}\" [ref=e{}]\n", 400 + i));
+        }
+        assert!(big.len() > 8_000, "test fixture must be a large 8,000+ char page, got {}", big.len());
+
+        let fov = fast_foveate_rust(&big, "Click Publications in top navigation bar", true);
+        assert!(fov.foveated_snapshot.contains("- navigation \"Top Nav\""), "must keep Top Nav landmark");
+        assert!(fov.foveated_snapshot.contains("Publications"), "must retain Publications link text");
+        assert!(fov.foveated_snapshot.contains("[ref=e12]"), "must retain Publications ref");
+        assert!(fov.foveated_snapshot.contains("saccade omitted"), "must still omit unrelated footer boilerplate");
+    }
+
+    #[test]
+    fn execute_tool_spec_includes_saccade_fast_path_routing() {
+        let base: Vec<Arc<dyn Tool>> = vec![
+            Arc::new(MockTool { name: "execute", reply: "ran".into() }),
+            Arc::new(MockTool { name: "snapshot", reply: "snap".into() }),
+        ];
+        let attached = attach_saccade_tools(base);
+        let exec_tool = attached
+            .iter()
+            .find(|t| t.spec().name == "execute")
+            .expect("execute tool must be present");
+        let desc = exec_tool.spec().description;
+        assert!(desc.starts_with(EXECUTE_ROUTING_HEADER), "routing block must sit at top of description: {desc}");
+        assert!(desc.contains("saccade_act"), "must guide agents to saccade_act");
+        assert!(desc.contains("saccade_extract"), "must guide agents to saccade_extract");
+        assert!(desc.contains("saccade_sweep"), "must guide agents to saccade_sweep");
+        assert!(desc.contains("visualFallback: true"), "must mention visualFallback for canvas/svg");
+        assert!(desc.contains("subgoal"), "must instruct passing subgoal to browse.snapshot");
+        assert!(desc.ends_with("mock"), "must preserve original execute description");
+        assert!(!desc.contains('\u{2014}'), "must contain zero em dashes");
+
+        // `surface::tools` also augments unwrapped `execute` specs and stays idempotent when already wrapped.
+        let raw_exec = ToolSpec {
+            name: "execute".into(),
+            description: "Run JS in tab.".into(),
+            input_schema: json!({}),
+        };
+        let surfaced = crate::surface::tools(Some("claude-code"), vec![raw_exec]);
+        assert_eq!(surfaced.len(), 1);
+        assert!(surfaced[0].description.starts_with(EXECUTE_ROUTING_HEADER));
+        assert!(surfaced[0].description.contains("saccade_act"));
+        assert!(surfaced[0].description.contains("saccade_extract"));
+        assert!(surfaced[0].description.contains("subgoal"));
+
+        let doubled = crate::surface::tools(Some("claude-code"), surfaced);
+        assert_eq!(
+            doubled[0].description.matches(EXECUTE_ROUTING_HEADER).count(),
+            1,
+            "augment_execute_spec must be idempotent"
+        );
+
+        // Disabled mode leaves description untouched.
+        assert_eq!(augment_execute_description_if("Run JS in tab.", false), "Run JS in tab.");
+    }
+
+    #[tokio::test]
+    async fn autospawn_timeout_default_and_early_exit_log_tail() {
+        assert_eq!(parse_spawn_timeout_secs(None), 45);
+        assert_eq!(parse_spawn_timeout_secs(Some("")), 45);
+        assert_eq!(parse_spawn_timeout_secs(Some("0")), 45);
+        assert_eq!(parse_spawn_timeout_secs(Some("90")), 90);
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let pid = std::process::id();
+            let dir = std::env::temp_dir().join(format!("saccade-spawn-test-{pid}"));
+            let _ = std::fs::create_dir_all(&dir);
+            let launcher = dir.join("fake-saccade-engine.sh");
+            let sock = dir.join("missing.sock");
+            let log = dir.join("saccade-engine.log");
+            std::fs::write(
+                &launcher,
+                "#!/bin/sh\necho 'line1: booting engine' >&2\necho 'fatal: missing MLX metal runtime' >&2\nexit 1\n",
+            )
+            .unwrap();
+            let mut perms = std::fs::metadata(&launcher).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&launcher, perms).unwrap();
+
+            let err = spawn_engine_and_wait(&launcher, &sock, &log, 5)
+                .await
+                .expect_err("early-exiting launcher must fail");
+            let msg = err.to_string();
+            assert!(msg.contains("exited early"), "unexpected error: {msg}");
+            assert!(
+                msg.contains("fatal: missing MLX metal runtime"),
+                "error must include stderr log tail: {msg}"
+            );
+            let _ = std::fs::remove_dir_all(&dir);
+        }
     }
 }

@@ -22,12 +22,20 @@ from typing import Any
 import mlx.core as mx
 import mlx.nn as nn
 
-from lfm_tinker.lora_d1 import (
-    LoRALinear,
-    inject_tri_hybrid_lora,
-    iter_lora_modules,
-    set_lora_enabled,
-)
+try:
+    from .lora_d1 import (
+        LoRALinear,
+        inject_tri_hybrid_lora,
+        iter_lora_modules,
+        set_lora_enabled,
+    )
+except ImportError:
+    from lora_d1 import (
+        LoRALinear,
+        inject_tri_hybrid_lora,
+        iter_lora_modules,
+        set_lora_enabled,
+    )
 
 
 def normalize_lora_key_to_mlx(key: str) -> str:

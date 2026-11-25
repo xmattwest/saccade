@@ -25,22 +25,60 @@ Measured end-to-end against headless Google Chrome over CDP across six multi-ste
 
 ---
 
-## Install in Three Commands (macOS Apple Silicon)
+## Install in Four Steps (macOS Apple Silicon)
 
-Prerequisites: Rust toolchain (`cargo`), [`uv`](https://docs.astral.sh/uv/), and the [`browse` Chrome extension](https://github.com/anomalyco/browse) paired with your browser.
+Prerequisites: Apple Silicon Mac (M1/M2/M3/M4), Rust toolchain (`cargo`), [`uv`](https://docs.astral.sh/uv/), and a Chrome-family browser (Google Chrome, Arc, Brave, Dia, Edge, or Vivaldi).
+
+### Step 1: Build the Rust `browse` relay & CLI
 
 ```bash
-# 1. Build the Rust relay & CLI:
 cargo build --manifest-path rust-browse/Cargo.toml --release -p browse
-
-# 2. Download the 96 MB LoRA adapter suite:
-uvx --from huggingface_hub hf download xmattwest/saccade-d1-2b-adapters --local-dir sidecar/adapters
-
-# 3. Install into all detected MCP coding agents (Claude Code, Codex, Antigravity, OpenCode, Cursor, etc.):
-SACCADE_ENGINE_BIN="$PWD/bin/saccade-engine" ./rust-browse/target/release/browse install --yes
 ```
 
-On your agent's first browser call, the Rust relay automatically spawns `bin/saccade-engine` over a `0.07 ms` Unix socket (`/tmp/saccade-lfm.sock`), keeps everyday DOM memory at `1.00 GiB`, pages in the `379 MB` vision tower from NVMe in `27 to 42 ms` only when screenshots arrive, and unloads weights back to `0.00 GiB` after 10 minutes of inactivity.
+### Step 2: Bootstrap the local MLX engine, adapters, and backbone
+
+```bash
+./bin/saccade-engine --setup
+```
+
+This single command sets up everything the local reflex engine needs:
+- Creates `~/.local/share/saccade/venv` (when no repo `.venv` is present) with the pinned Apple Silicon MLX runtime dependencies.
+- Downloads the `96 MB` [`xmattwest/saccade-d1-2b-adapters`](https://huggingface.co/xmattwest/saccade-d1-2b-adapters) LoRA suite and pre-caches the `1.25 GB` [`LiquidAI/d1-2B-MLX-4bit`](https://huggingface.co/LiquidAI/d1-2B-MLX-4bit) backbone with progress bars so your first browser call never stalls on a cold download.
+- Verifies Metal GPU availability and adapter integrity.
+- Symlinks `~/.local/share/saccade/bin/saccade-engine` (and records the resolved adapters path) so `browse` finds `saccade-engine` automatically from any path without manually exporting `SACCADE_ENGINE_BIN`.
+
+### Step 3: Install & pair the Chrome extension (20 seconds)
+
+1. Add the official [`browse` extension from the Chrome Web Store](https://chromewebstore.google.com/detail/mfnicocicmmlkpjnaffgihfjhdgjkdjg) (or run `./rust-browse/target/release/browse extension` anytime for the store URL and unpacked `chrome://extensions` -> **Developer mode** -> **Load unpacked** dev-zip instructions).
+2. Pair your browser with a one-time code:
+
+```bash
+./rust-browse/target/release/browse pair
+```
+
+In Chrome, open **Extensions -> browse -> Options -> Pair with a code**, enter the pairing code printed in your terminal, and click **Connect**.
+
+### Step 4: Register across all detected MCP coding agents
+
+```bash
+./rust-browse/target/release/browse install --yes
+```
+
+This registers the Saccade-accelerated `browse` MCP server across Claude Code, Codex, Antigravity, OpenCode, Cursor, and 30+ detected coding agents.
+
+On your agent's first browser call, the Rust relay automatically spawns `saccade-engine` over a `0.07 ms` Unix socket (`/tmp/saccade-lfm.sock`), keeps everyday DOM memory at `1.00 GiB`, pages in the `379 MB` vision tower from NVMe in `27 to 42 ms` only when screenshots arrive, and unloads weights back to `0.00 GiB` after 10 minutes of inactivity.
+
+---
+
+## Verify It's Working
+
+Run the fast offline readiness check to confirm Python/MLX imports, Metal availability, and all six LoRA adapter files in under a second (no downloads):
+
+```bash
+./bin/saccade-engine --check
+```
+
+Then ask your coding agent to browse any site and call `saccade_status` with `{ "action": "telemetry" }` (or run `./rust-browse/target/release/browse saccade_status --action telemetry` directly) to inspect live local trigger counts, `0.17 ms` average LoRA swap times, and `1.00 GiB` resident Metal RAM.
 
 ---
 
@@ -95,7 +133,8 @@ Frontier Coding Agent (Claude Code / Codex / Antigravity / OpenCode / Cursor)
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `SACCADE_SOCKET` | `/tmp/saccade-lfm.sock` | Unix domain socket path between Rust `browse` and `saccade-engine`. |
-| `SACCADE_ENGINE_BIN` | Auto-detected | Explicit path to `bin/saccade-engine` launcher. |
+| `SACCADE_ENGINE_BIN` | Auto-detected | Explicit path to `bin/saccade-engine` launcher (falls back to `~/.local/share/saccade/bin/saccade-engine`). |
+| `SACCADE_SPAWN_TIMEOUT_SEC` | `45` | Seconds the Rust relay waits for `saccade-engine` to start and bind its Unix socket on cold start. |
 | `SACCADE_IDLE_UNLOAD_SEC` | `600` | Seconds of inactivity before unloading weights to `0.00 GiB` (`0` disables). |
 | `SACCADE_DISABLE` | `0` | Set `1` to bypass Saccade completely and run stock `browse`. |
 

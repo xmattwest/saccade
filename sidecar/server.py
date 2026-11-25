@@ -26,23 +26,35 @@ from typing import Any
 import mlx.core as mx
 from PIL import Image
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-if str(REPO_ROOT / "src") not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT / "src"))
+SIDECAR_DIR = Path(__file__).resolve().parent
+SACCADE_ROOT = SIDECAR_DIR.parent
 
-from saccade.sidecar.aftermath import AlgorithmRTimeMachineBuffer, judge_aftermath
-from saccade.sidecar.firewall import check_pre_cdp_firewall
-from saccade.sidecar.foveate import foveate_snapshot
-from saccade.sidecar.grounder import (
-    act_and_guard_single_pass,
-    ground_som_visual,
-    ground_visual_box,
-    pick_dom_ref,
-)
-from saccade.sidecar.multi_lora import ResidentD1MultiLoRA
-from saccade.sidecar.quickjs_etl import UnifiedD1Scripter
+if __package__:
+    from .aftermath import AlgorithmRTimeMachineBuffer, judge_aftermath
+    from .firewall import check_pre_cdp_firewall
+    from .foveate import foveate_snapshot
+    from .grounder import (
+        act_and_guard_single_pass,
+        ground_som_visual,
+        ground_visual_box,
+        pick_dom_ref,
+    )
+    from .multi_lora import ResidentD1MultiLoRA
+    from .quickjs_etl import UnifiedD1Scripter
+else:
+    if str(SACCADE_ROOT) not in sys.path:
+        sys.path.insert(0, str(SACCADE_ROOT))
+    from sidecar.aftermath import AlgorithmRTimeMachineBuffer, judge_aftermath
+    from sidecar.firewall import check_pre_cdp_firewall
+    from sidecar.foveate import foveate_snapshot
+    from sidecar.grounder import (
+        act_and_guard_single_pass,
+        ground_som_visual,
+        ground_visual_box,
+        pick_dom_ref,
+    )
+    from sidecar.multi_lora import ResidentD1MultiLoRA
+    from sidecar.quickjs_etl import UnifiedD1Scripter
 
 DEFAULT_SOCK = "/tmp/saccade-lfm.sock"
 DEFAULT_IDLE_UNLOAD_SEC = float(os.environ.get("SACCADE_IDLE_UNLOAD_SECONDS", "600"))
@@ -420,7 +432,7 @@ def main() -> None:
     parser.add_argument("--socket", default=os.environ.get("SACCADE_SOCKET", DEFAULT_SOCK))
     parser.add_argument(
         "--adapters-dir",
-        default=os.environ.get("SACCADE_ADAPTERS_DIR", str(REPO_ROOT / "saccade/sidecar/adapters")),
+        default=os.environ.get("SACCADE_ADAPTERS_DIR", str(SIDECAR_DIR / "adapters")),
     )
     parser.add_argument("--eager-vision", action="store_true")
     parser.add_argument("--force-v1", action="store_true")

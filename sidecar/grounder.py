@@ -8,10 +8,16 @@ from typing import Any
 
 from PIL import Image
 
-from .firewall import DESTRUCTIVE_QUESTION, INJECTION_QUESTION
-from .foveate import _stem_tokens, fast_foveate_snapshot
-from .multi_lora import ResidentD1MultiLoRA
-from .som import propose_visual_ui_regions, stamp_som_badges
+try:
+    from .firewall import DESTRUCTIVE_QUESTION, INJECTION_QUESTION
+    from .foveate import _stem_tokens, fast_foveate_snapshot
+    from .multi_lora import ResidentD1MultiLoRA
+    from .som import propose_visual_ui_regions, stamp_som_badges
+except ImportError:
+    from firewall import DESTRUCTIVE_QUESTION, INJECTION_QUESTION
+    from foveate import _stem_tokens, fast_foveate_snapshot
+    from multi_lora import ResidentD1MultiLoRA
+    from som import propose_visual_ui_regions, stamp_som_badges
 
 CAND_RE = re.compile(r"^(?P<indent>\s*)-\s+(?P<body>.*?)\[ref=(?P<ref>e\d+)\b(?P<rest>[^\]]*)\]")
 

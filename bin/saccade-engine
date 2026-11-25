@@ -1,32 +1,460 @@
 #!/usr/bin/env bash
-# Standalone Apple Silicon Saccade Unified Engine Launcher (`0.98 GiB` DOM / `1.34 GiB` VLM / `0.00 GiB` Idle).
+# Standalone Apple Silicon Saccade Unified Engine Launcher & Turnkey Bootstrapper
+# (`0.98 GiB` DOM / `1.34 GiB` VLM / `0.00 GiB` Idle).
 # Auto-spawned on demand by the Rust `browse` relay over Unix domain socket (`/tmp/saccade-lfm.sock`).
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+resolve_script_path() {
+  local src="$1"
+  while [ -L "$src" ]; do
+    local dir
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  local dir
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  printf '%s/%s\n' "$dir" "$(basename "$src")"
+}
+
+SCRIPT_PATH="$(resolve_script_path "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 SACCADE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SACCADE_DIR/.." && pwd)"
 
 SACCADE_HOME="${SACCADE_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/saccade}"
 SOCK_PATH="${SACCADE_SOCKET:-/tmp/saccade-lfm.sock}"
-ADAPTERS_DIR="${SACCADE_ADAPTERS_DIR:-$SACCADE_DIR/sidecar/adapters}"
 IDLE_SEC="${SACCADE_IDLE_UNLOAD_SECONDS:-600}"
+ADAPTERS_REPO="${SACCADE_ADAPTERS_REPO:-xmattwest/saccade-d1-2b-adapters}"
+BACKBONE_REPO="${SACCADE_BACKBONE_REPO:-LiquidAI/d1-2B-MLX-4bit}"
 
-# 1. Prefer repo virtualenv when running from a source checkout; otherwise bootstrap standalone Apple Silicon runtime
-if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
-  PY_BIN="$REPO_ROOT/.venv/bin/python"
-elif [ -x "$SACCADE_HOME/venv/bin/python" ]; then
-  PY_BIN="$SACCADE_HOME/venv/bin/python"
-else
-  mkdir -p "$SACCADE_HOME"
-  if ! command -v uv >/dev/null 2>&1; then
-    echo "[saccade-engine] Installing uv for standalone Apple Silicon MLX runtime..." >&2
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
+PINNED_DEPS=(
+  "mlx>=0.25"
+  "mlx-lm>=0.32.2"
+  "mlx-vlm>=0.7.11"
+  "huggingface_hub>=0.30"
+  "pillow>=10.0"
+  "jsonschema>=4.20"
+  "numpy>=1.26"
+)
+
+# Detect main checkout root when running inside a git worktree (no hardcoded paths)
+GIT_COMMON_ROOT=""
+if command -v git >/dev/null 2>&1; then
+  _gcd="$(git -C "$SACCADE_DIR" rev-parse --git-common-dir 2>/dev/null || true)"
+  if [ -n "$_gcd" ]; then
+    if [[ "$_gcd" != /* ]]; then
+      _gcd="$(cd "$SACCADE_DIR/$_gcd" 2>/dev/null && pwd || true)"
+    fi
+    if [ -n "$_gcd" ] && [ -d "$_gcd" ]; then
+      GIT_COMMON_ROOT="$(cd "$_gcd/.." && pwd)"
+    fi
   fi
-  echo "[saccade-engine] Bootstrapping standalone arm64 MLX environment in $SACCADE_HOME/venv..." >&2
-  uv venv --python 3.12 "$SACCADE_HOME/venv"
-  uv pip install --python "$SACCADE_HOME/venv/bin/python" "mlx>=0.22" "mlx-vlm>=0.3.12" "pillow>=10.0" "jsonschema>=4.20" "numpy>=1.26"
+fi
+
+has_adapter_weights() {
+  local dir="$1"
+  [ -f "$dir/d1_reflex_v2/adapters.safetensors" ]
+}
+
+has_any_adapter_weights() {
+  local dir="$1"
+  [ -d "$dir" ] && find "$dir" -maxdepth 2 -name "adapters.safetensors" -print -quit 2>/dev/null | grep -q .
+}
+
+resolve_adapters_dir() {
+  if [ -n "${SACCADE_ADAPTERS_DIR:-}" ]; then
+    printf '%s\n' "$SACCADE_ADAPTERS_DIR"
+    return 0
+  fi
+
+  local local_dir="$SACCADE_DIR/sidecar/adapters"
+  if has_adapter_weights "$local_dir"; then
+    printf '%s\n' "$local_dir"
+    return 0
+  fi
+
+  if [ -f "$SACCADE_HOME/adapters_path.txt" ]; then
+    local saved_dir
+    saved_dir="$(head -n 1 "$SACCADE_HOME/adapters_path.txt" | tr -d '\r\n')"
+    if [ -n "$saved_dir" ] && has_any_adapter_weights "$saved_dir"; then
+      printf '%s\n' "$saved_dir"
+      return 0
+    fi
+  fi
+
+  if has_adapter_weights "$SACCADE_HOME/adapters"; then
+    printf '%s\n' "$SACCADE_HOME/adapters"
+    return 0
+  fi
+
+  if [ -n "$GIT_COMMON_ROOT" ] && has_adapter_weights "$GIT_COMMON_ROOT/saccade/sidecar/adapters"; then
+    printf '%s\n' "$GIT_COMMON_ROOT/saccade/sidecar/adapters"
+    return 0
+  fi
+
+  if has_any_adapter_weights "$local_dir"; then
+    printf '%s\n' "$local_dir"
+    return 0
+  fi
+
+  printf '%s\n' "$local_dir"
+}
+
+ADAPTERS_DIR="$(resolve_adapters_dir)"
+
+find_repo_venv_python() {
+  if [ -x "$SACCADE_DIR/.venv/bin/python" ]; then
+    printf '%s\n' "$SACCADE_DIR/.venv/bin/python"
+    return 0
+  fi
+  if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+    printf '%s\n' "$REPO_ROOT/.venv/bin/python"
+    return 0
+  fi
+  if [ -n "$GIT_COMMON_ROOT" ] && [ -x "$GIT_COMMON_ROOT/.venv/bin/python" ]; then
+    printf '%s\n' "$GIT_COMMON_ROOT/.venv/bin/python"
+    return 0
+  fi
+  return 1
+}
+
+find_existing_python() {
+  if [ -n "${SACCADE_PYTHON:-}" ] && [ -x "$SACCADE_PYTHON" ]; then
+    printf '%s\n' "$SACCADE_PYTHON"
+    return 0
+  fi
+
+  local repo_py
+  if repo_py="$(find_repo_venv_python)"; then
+    printf '%s\n' "$repo_py"
+    return 0
+  fi
+
+  if [ -x "$SACCADE_HOME/venv/bin/python" ]; then
+    printf '%s\n' "$SACCADE_HOME/venv/bin/python"
+    return 0
+  fi
+
+  if [ -f "$SACCADE_HOME/python_path.txt" ]; then
+    local saved_py
+    saved_py="$(head -n 1 "$SACCADE_HOME/python_path.txt" | tr -d '\r\n')"
+    if [ -n "$saved_py" ] && [ -x "$saved_py" ]; then
+      printf '%s\n' "$saved_py"
+      return 0
+    fi
+  fi
+
+  # If SACCADE_ADAPTERS_DIR points inside a repo checkout with a .venv, reuse it
+  if [ -n "${SACCADE_ADAPTERS_DIR:-}" ] && [ -d "$SACCADE_ADAPTERS_DIR" ]; then
+    local probe
+    probe="$(cd "$SACCADE_ADAPTERS_DIR" && pwd)"
+    local depth=0
+    while [ "$depth" -lt 4 ] && [ "$probe" != "/" ]; do
+      if [ -x "$probe/.venv/bin/python" ]; then
+        printf '%s\n' "$probe/.venv/bin/python"
+        return 0
+      fi
+      probe="$(dirname "$probe")"
+      depth=$((depth + 1))
+    done
+  fi
+
+  if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
+    printf '%s\n' "$VIRTUAL_ENV/bin/python"
+    return 0
+  fi
+
+  return 1
+}
+
+ensure_uv() {
+  if command -v uv >/dev/null 2>&1; then
+    return 0
+  fi
+  for cand in "$HOME/.local/bin" "$HOME/.cargo/bin"; do
+    if [ -x "$cand/uv" ]; then
+      export PATH="$cand:$PATH"
+      return 0
+    fi
+  done
+  echo "[saccade-engine] Installing uv for standalone Apple Silicon MLX runtime..." >&2
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="$HOME/.local/bin:$PATH"
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "[saccade-engine] ERROR: uv installation failed. Install uv from https://docs.astral.sh/uv/ and retry." >&2
+    return 1
+  fi
+}
+
+bootstrap_standalone_venv() {
+  ensure_uv
+  mkdir -p "$SACCADE_HOME"
+  if [ ! -x "$SACCADE_HOME/venv/bin/python" ]; then
+    echo "[saccade-engine] Creating standalone Python 3.12 MLX venv in $SACCADE_HOME/venv..." >&2
+    uv venv --python 3.12 "$SACCADE_HOME/venv"
+  fi
+  echo "[saccade-engine] Installing pinned Apple Silicon MLX dependencies into $SACCADE_HOME/venv..." >&2
+  uv pip install --python "$SACCADE_HOME/venv/bin/python" "${PINNED_DEPS[@]}"
+}
+
+run_check() {
+  local py_bin="${1:-}"
+  if [ -z "$py_bin" ]; then
+    if ! py_bin="$(find_existing_python)"; then
+      echo "Saccade Engine Check: NOT READY"
+      echo "  [FAIL] Python MLX runtime: no .venv or $SACCADE_HOME/venv found"
+      echo "  [INFO] Expected adapters dir: $ADAPTERS_DIR"
+      echo "  [NEXT] Run: $SCRIPT_PATH --setup"
+      return 1
+    fi
+  fi
+
+  SACCADE_CHECK_DIR="$SACCADE_DIR" \
+  SACCADE_CHECK_ADAPTERS="$ADAPTERS_DIR" \
+  SACCADE_CHECK_BACKBONE="$BACKBONE_REPO" \
+  SACCADE_CHECK_SOCK="$SOCK_PATH" \
+  SACCADE_CHECK_HOME="$SACCADE_HOME" \
+  SACCADE_CHECK_SCRIPT="$SCRIPT_PATH" \
+  "$py_bin" - <<'PY'
+import importlib
+import os
+import sys
+from pathlib import Path
+
+saccade_dir = Path(os.environ["SACCADE_CHECK_DIR"])
+adapters_dir = Path(os.environ["SACCADE_CHECK_ADAPTERS"])
+backbone_repo = os.environ["SACCADE_CHECK_BACKBONE"]
+sock_path = os.environ["SACCADE_CHECK_SOCK"]
+saccade_home = Path(os.environ["SACCADE_CHECK_HOME"])
+script_path = os.environ["SACCADE_CHECK_SCRIPT"]
+
+ok = True
+lines = []
+
+# 1. Core Python dependencies
+req_pkgs = [
+    ("mlx.core", "mlx"),
+    ("mlx_lm", "mlx-lm"),
+    ("mlx_vlm", "mlx-vlm"),
+    ("huggingface_hub", "huggingface_hub"),
+    ("PIL", "pillow"),
+    ("jsonschema", "jsonschema"),
+    ("numpy", "numpy"),
+]
+missing_pkgs = []
+for mod_name, label in req_pkgs:
+    try:
+        importlib.import_module(mod_name)
+    except Exception as exc:
+        missing_pkgs.append(f"{label} ({exc})")
+
+if missing_pkgs:
+    ok = False
+    lines.append(f"  [FAIL] Python dependencies missing: {', '.join(missing_pkgs)}")
+else:
+    lines.append(f"  [OK]   Python runtime & MLX deps: {sys.executable}")
+
+# 2. Metal GPU availability (lightweight check; does not load any model weights)
+metal_ok = False
+if not missing_pkgs:
+    import mlx.core as mx
+    try:
+        metal_ok = bool(mx.metal.is_available())
+    except Exception:
+        metal_ok = False
+    if metal_ok:
+        lines.append("  [OK]   Apple Metal GPU: available")
+    else:
+        ok = False
+        lines.append("  [FAIL] Apple Metal GPU: mx.metal.is_available() returned False")
+
+# 3. Standalone sidecar module imports (isolated from any parent monorepo)
+if str(saccade_dir) not in sys.path:
+    sys.path.insert(0, str(saccade_dir))
+sidecar_mods = [
+    "sidecar.lora_d1",
+    "sidecar.multi_lora",
+    "sidecar.foveate",
+    "sidecar.grounder",
+    "sidecar.firewall",
+    "sidecar.aftermath",
+    "sidecar.som",
+    "sidecar.quickjs_etl",
+    "sidecar.server",
+]
+bad_sidecar = []
+for mod_name in sidecar_mods:
+    try:
+        importlib.import_module(mod_name)
+    except Exception as exc:
+        bad_sidecar.append(f"{mod_name}: {exc}")
+if bad_sidecar:
+    ok = False
+    lines.append(f"  [FAIL] Sidecar standalone imports: {'; '.join(bad_sidecar)}")
+else:
+    lines.append(f"  [OK]   Sidecar standalone modules ({len(sidecar_mods)}/9): {saccade_dir / 'sidecar'}")
+
+# 4. Adapter weights presence
+v2_reflex = adapters_dir / "d1_reflex_v2" / "adapters.safetensors"
+found_adapters = sorted(
+    p.parent.name for p in adapters_dir.glob("*/adapters.safetensors")
+) if adapters_dir.is_dir() else []
+
+if v2_reflex.exists():
+    lines.append(f"  [OK]   LoRA adapters ({len(found_adapters)} found): {adapters_dir}")
+elif found_adapters:
+    lines.append(f"  [WARN] LoRA v1 adapters found ({len(found_adapters)}), missing d1_reflex_v2: {adapters_dir}")
+else:
+    ok = False
+    lines.append(f"  [FAIL] LoRA adapters missing at {adapters_dir}")
+    lines.append(f"         Run `{script_path} --setup` to pull xmattwest/saccade-d1-2b-adapters or set SACCADE_ADAPTERS_DIR.")
+
+# 5. Backbone HF local cache status (no network call)
+if not missing_pkgs:
+    try:
+        from huggingface_hub import try_to_load_from_cache
+        cached = try_to_load_from_cache(repo_id=backbone_repo, filename="config.json")
+        if isinstance(cached, str) and Path(cached).exists():
+            lines.append(f"  [OK]   Backbone cache ({backbone_repo}): cached locally")
+        else:
+            lines.append(f"  [INFO] Backbone cache ({backbone_repo}): not cached yet (run `{script_path} --setup` to pre-cache)")
+    except Exception as exc:
+        lines.append(f"  [INFO] Backbone cache check skipped: {exc}")
+
+# 6. Link & socket status (informational)
+link_path = saccade_home / "bin" / "saccade-engine"
+if link_path.exists():
+    lines.append(f"  [OK]   Global launcher link: {link_path} -> {link_path.resolve()}")
+else:
+    lines.append(f"  [INFO] Global launcher link: not created yet (run `{script_path} --setup`)")
+
+sock_state = "listening" if os.path.exists(sock_path) else "idle (auto-spawns on demand)"
+lines.append(f"  [INFO] Unix socket ({sock_path}): {sock_state}")
+
+status = "READY" if ok else "NOT READY"
+print(f"Saccade Engine Check: {status}")
+for ln in lines:
+    print(ln)
+sys.exit(0 if ok else 1)
+PY
+}
+
+run_setup() {
+  echo "[saccade-engine] Starting Saccade turnkey setup..."
+
+  # a) Ensure uv is available and repo .venv or ~/.local/share/saccade/venv has pinned MLX dependencies
+  ensure_uv
+  local py_bin=""
+  if py_bin="$(find_repo_venv_python)"; then
+    echo "[saccade-engine] Using existing repo virtualenv: $py_bin"
+  else
+    bootstrap_standalone_venv
+    py_bin="$SACCADE_HOME/venv/bin/python"
+  fi
+
+  # b) Download xmattwest/saccade-d1-2b-adapters if d1_reflex_v2/adapters.safetensors is not present locally
+  if has_adapter_weights "$ADAPTERS_DIR"; then
+    echo "[saccade-engine] Adapters already present at $ADAPTERS_DIR"
+  elif [ "${SACCADE_SKIP_HF_ADAPTER_PULL:-0}" = "1" ]; then
+    echo "[saccade-engine] Skipping Hugging Face adapter download (SACCADE_SKIP_HF_ADAPTER_PULL=1)."
+  else
+    mkdir -p "$ADAPTERS_DIR"
+    echo "[saccade-engine] Downloading LoRA adapter suite ($ADAPTERS_REPO) into $ADAPTERS_DIR..."
+    if ! SACCADE_PULL_REPO="$ADAPTERS_REPO" SACCADE_PULL_DEST="$ADAPTERS_DIR" "$py_bin" - <<'PY'
+import os
+import sys
+from huggingface_hub import snapshot_download
+
+repo = os.environ["SACCADE_PULL_REPO"]
+dest = os.environ["SACCADE_PULL_DEST"]
+try:
+    snapshot_download(repo_id=repo, local_dir=dest)
+except Exception as exc:
+    print(f"[saccade-engine] WARNING: Could not download adapters from {repo}: {exc}", file=sys.stderr)
+    print("[saccade-engine]   If offline or developing locally before HF publish, set SACCADE_ADAPTERS_DIR=/path/to/adapters or SACCADE_SKIP_HF_ADAPTER_PULL=1.", file=sys.stderr)
+    sys.exit(2)
+PY
+    then
+      echo "[saccade-engine] Continuing setup after adapter pull warning; run --check once adapters are in place." >&2
+    fi
+  fi
+
+  # c) Pre-cache LiquidAI/d1-2B-MLX-4bit with visible terminal progress
+  if [ "${SACCADE_SKIP_HF_BACKBONE_PULL:-0}" = "1" ]; then
+    echo "[saccade-engine] Skipping backbone pre-cache (SACCADE_SKIP_HF_BACKBONE_PULL=1)."
+  else
+    echo "[saccade-engine] Pre-caching backbone ($BACKBONE_REPO) via Hugging Face Hub..."
+    SACCADE_PULL_REPO="$BACKBONE_REPO" "$py_bin" - <<'PY'
+import os
+import sys
+from huggingface_hub import snapshot_download
+
+repo = os.environ["SACCADE_PULL_REPO"]
+try:
+    path = snapshot_download(repo_id=repo)
+    print(f"[saccade-engine] Backbone cached at: {path}")
+except Exception as exc:
+    print(f"[saccade-engine] WARNING: Could not pre-cache {repo}: {exc}", file=sys.stderr)
+    sys.exit(1)
+PY
+  fi
+
+  # d) Symlink ~/.local/share/saccade/bin/saccade-engine -> real script and record resolved adapters path
+  mkdir -p "$SACCADE_HOME/bin"
+  ln -sfn "$SCRIPT_PATH" "$SACCADE_HOME/bin/saccade-engine"
+  local abs_adapters_dir
+  if [ -d "$ADAPTERS_DIR" ]; then
+    abs_adapters_dir="$(cd "$ADAPTERS_DIR" && pwd)"
+  else
+    abs_adapters_dir="$ADAPTERS_DIR"
+  fi
+  printf '%s\n' "$abs_adapters_dir" > "$SACCADE_HOME/adapters_path.txt"
+  if [ "$py_bin" != "$SACCADE_HOME/venv/bin/python" ]; then
+    printf '%s\n' "$py_bin" > "$SACCADE_HOME/python_path.txt"
+  fi
+  echo "[saccade-engine] Linked $SACCADE_HOME/bin/saccade-engine -> $SCRIPT_PATH"
+  echo "[saccade-engine] Recorded adapters path in $SACCADE_HOME/adapters_path.txt"
+
+  # e) Fast Python + Metal + adapter readiness check
+  run_check "$py_bin"
+}
+
+print_usage() {
+  cat <<EOF
+Usage: $(basename "$0") [--setup | --check | --help | <server.py options...>]
+
+Options:
+  --setup    Bootstrap Apple Silicon MLX runtime, pull LoRA adapters, pre-cache
+             LiquidAI/d1-2B-MLX-4bit, link ~/.local/share/saccade/bin/saccade-engine,
+             and verify readiness.
+  --check    Fast offline verification of Python deps, standalone sidecar imports,
+             Metal GPU availability, and LoRA adapter presence (no downloads).
+  --help     Show this message.
+
+Without --setup or --check, launches the Saccade Unix-socket sidecar daemon
+($SOCK_PATH) using adapters from $ADAPTERS_DIR.
+EOF
+}
+
+case "${1:-}" in
+  --setup)
+    run_setup
+    exit $?
+    ;;
+  --check)
+    run_check
+    exit $?
+    ;;
+  --help|-h)
+    print_usage
+    exit 0
+    ;;
+esac
+
+# Normal daemon launch: prefer existing venv; otherwise bootstrap standalone Apple Silicon runtime
+if ! PY_BIN="$(find_existing_python)"; then
+  bootstrap_standalone_venv
   PY_BIN="$SACCADE_HOME/venv/bin/python"
 fi
 
