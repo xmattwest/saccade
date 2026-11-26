@@ -22,6 +22,8 @@ use crate::paths::Paths;
 use crate::serve::{RelayHandle, ServeOptions, start};
 use crate::util::{b64url, from_b64url, random_bytes};
 
+mod auto_launch;
+
 type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 struct Harness {

@@ -147,6 +147,8 @@ pub fn start_from(executable: &std::path::Path) -> anyhow::Result<()> {
         if ENV_NAMES.contains(&upper.as_str())
             || upper.starts_with("OPENCODE_BROWSER_")
             || upper.starts_with("SACCADE_")
+            || matches!(upper.as_str(), "BROWSE_AUTO_LAUNCH" | "BROWSE_CHROME_APP" | "BROWSE_CHROME_PROFILE" | "BROWSE_AUTO_LAUNCH_TIMEOUT_MS")
+            || matches!(upper.as_str(), "HF_HUB_OFFLINE" | "TRANSFORMERS_OFFLINE")
             || upper.starts_with("LC_")
             || npm
         {
@@ -332,4 +334,3 @@ pub fn specs(client: Option<&str>) -> Vec<ToolSpec> {
         _ => local(),
     }
 }
-

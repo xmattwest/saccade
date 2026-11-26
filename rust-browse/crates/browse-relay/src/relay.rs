@@ -423,6 +423,7 @@ pub struct Relay {
     pub origins: HashSet<String>,
     pub file_roots: Vec<PathBuf>,
     pub auto_update: Option<AutoUpdateStatus>,
+    pub(crate) auto_launch: RwLock<Arc<crate::auto_launch::AutoLaunch>>,
     pub idle_tab_ttl: Option<Duration>,
     pub state: Mutex<State>,
     pub changed: Notify,
@@ -483,6 +484,7 @@ impl Relay {
             origins: crate::origins::allowed_extension_origins(),
             file_roots,
             auto_update: config.auto_update,
+            auto_launch: RwLock::new(crate::auto_launch::AutoLaunch::from_env()),
             idle_tab_ttl: env_ms("OPENCODE_BROWSER_IDLE_TAB_TTL_MS", 15 * 60_000),
             state: Mutex::new(State {
                 links: Vec::new(),

@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-26",
+  "feature": "macOS paired Chrome profile background startup",
+  "profile_directory": "Default",
+  "unit_and_integration_tests": { "passed": 164, "ignored": 1 },
+  "workspace_all_targets_typecheck": "passed",
+  "release_build": "passed",
+  "live_check": {
+    "browser_connected_before_tool": false,
+    "background_launch_requested": true,
+    "browser_connected_after_tool": true,
+    "url": "https://example.com/",
+    "title": "Example Domain",
+    "tool_elapsed_ms": 568,
+    "chrome_restarted": false,
+    "existing_tabs_preserved": true,
+    "test_tab_closed": true
+  },
+  "limitations": [
+    "The live check kept Chrome running and restarted only the relay.",
+    "A fully closed Chrome launch was not live-tested.",
+    "Different-profile fallback passed automated tests but was not live-tested.",
+    "The single live reconnect timing is not an inference benchmark."
+  ],
+  "adapter_weights_changed": false
+}

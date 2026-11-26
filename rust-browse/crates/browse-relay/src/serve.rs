@@ -616,32 +616,36 @@ pub async fn call_tool_keyed(relay: &Arc<Relay>, request: ToolCallRequest, clien
     let context = ToolContext { browser: Arc::new(RelayBrowser(relay.clone())), file_roots: relay.file_roots.clone() };
     let id = relay.next_call.fetch_add(1, Ordering::SeqCst);
     let mut arguments = if request.arguments.is_null() { json!({}) } else { request.arguments };
-    // `tab` takes a numeric id or a chosen id (`work-mail`); tools below this line see the numeric one.
-    let chosen = match resolve_tab_arguments(relay, &mut arguments) {
-        Ok(chosen) => chosen,
-        Err(message) => return Ok(ToolOutput::error(message)),
-    };
-    if let Some(chosen) = &chosen {
-        let tab = arguments["tab"].as_i64().unwrap_or_default();
-        // A second call on a chosen-id tab gets a clear error instead of interleaving with the one running there.
-        // A capture or recording is background work, not a call, so it doesn't refuse calls by the chosen id.
-        let busy = {
-            let mut st = relay.st();
-            let busy = st.tab_call_busy(tab) || st.chosen_reserved(chosen);
-            if !busy {
-                st.chosen_calls.insert(id, tab);
-            }
-            busy
-        };
-        if busy {
-            return Ok(ToolOutput::error(format!("{chosen} is busy: another call is running in that tab. Wait for it to finish, then try again.")));
-        }
-    }
     let tab = arguments.get("tab").and_then(Value::as_i64);
     let name = request.name.clone();
     let started = Instant::now();
     relay.inflight.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(id, InFlight { tool: name.clone(), tab, since: started });
-    let task = tokio::spawn(RELAY.scope(relay.clone(), CALL.scope(id, TOOL.scope(name.clone(), CLIENT.scope(client_pid, async move { tool.call(context, arguments).await })))));
+    let task_relay = relay.clone();
+    let task_name = name.clone();
+    let task = tokio::spawn(RELAY.scope(relay.clone(), CALL.scope(id, TOOL.scope(name.clone(), CLIENT.scope(client_pid, async move {
+        // Startup is part of the tracked/cancellable call, but its shared single-flight attempt
+        // outlives an individual waiter. Restore inventory before resolving named tabs.
+        if matches!(task_name.as_str(), "execute" | "tabs" | "saccade_act" | "saccade_extract" | "saccade_sweep") {
+            task_relay.ensure_browser_connected().await?;
+        }
+        let chosen = resolve_tab_arguments(&task_relay, &mut arguments).map_err(|message| anyhow::anyhow!(message))?;
+        if let Some(chosen) = &chosen {
+            let tab = arguments["tab"].as_i64().unwrap_or_default();
+            let busy = {
+                let mut st = task_relay.st();
+                let busy = st.tab_call_busy(tab) || st.chosen_reserved(chosen);
+                if !busy { st.chosen_calls.insert(id, tab); }
+                busy
+            };
+            if busy {
+                anyhow::bail!("{chosen} is busy: another call is running in that tab. Wait for it to finish, then try again.");
+            }
+        }
+        if let Some(call) = task_relay.inflight.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).get_mut(&id) {
+            call.tab = arguments.get("tab").and_then(Value::as_i64);
+        }
+        tool.call(context, arguments).await
+    })))));
     relay.call_started(id, task.abort_handle(), client_pid, key);
     let outcome = task.await;
     let stopped = relay.st().stopped.remove(&id);

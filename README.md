@@ -130,6 +130,54 @@ Frontier Coding Agent (Claude Code / Codex / Antigravity / OpenCode / Cursor)
 
 ## Environment Controls
 
+### Background Chrome startup
+
+On macOS, a browser tool call can start your paired Chrome profile in the
+background when no browser is connected. This applies to `execute`, `tabs`,
+`saccade_act`, `saccade_extract`, `saccade_sweep`, and new-tab operations.
+It uses the paired `browse` extension, not Chrome DevTools remote debugging,
+so this route does not require Chrome's remote-debugging Allow prompt.
+
+Parallel calls share one launch attempt. The relay waits up to 8 seconds for
+the extension to reconnect before continuing the original call. Failed attempts
+have a 20-second cooldown. Tool discovery, `status`, and `saccade_status` never
+start Chrome. Ambiguous profile detection stops with an override instruction;
+the relay does not create a new profile or enable a disabled extension.
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `BROWSE_AUTO_LAUNCH` | `true` | Set `0` or `false` to disable background Chrome startup. |
+| `BROWSE_CHROME_APP` | `Google Chrome` | App name or absolute `.app` bundle path. Standard Beta/Dev/Canary names select the corresponding Chrome data root. |
+| `BROWSE_CHROME_PROFILE` | Auto-detected | Existing directory name such as `Default` or `Profile 1`, not the display name or an absolute path. |
+| `BROWSE_AUTO_LAUNCH_TIMEOUT_MS` | `8000` | Total launch/reconnect budget, up to `120000` ms. |
+
+The relay checks Chrome's `Local State`, extension preferences, and local pairing
+UUID records where available. It first uses `open -g -a ... --args
+--profile-directory=...`. If the extension does not reconnect, it tries the app's
+executable with `--profile-directory`, `--no-first-run`, and
+`--no-startup-window`, which requests profile startup without activating a window.
+
+To upgrade an existing checkout:
+
+```bash
+git pull --ff-only
+cargo build --manifest-path rust-browse/Cargo.toml --release -p browse
+./rust-browse/target/release/browse restart
+```
+
+Use this binary as a stdio MCP server with command
+`/absolute/path/to/saccade/rust-browse/target/release/browse` and args `["mcp"]`.
+Set overrides in that MCP entry's `env`. If you restart the relay from a terminal,
+supply the same variables on the restart command. Restarting Gemini or another
+MCP client alone does not replace an already-running shared relay.
+
+Verification: 164 unit/integration tests passed, with one optional memory test
+ignored. A live disconnected-relay check opened `example.com` in 568 ms while
+Chrome stayed running. A fully closed Chrome launch and different-profile fallback
+were not live-tested in that check. See [the saved smoke-test summary](results/chrome_auto_launch_smoke.json).
+This is a relay update; the adapter weights and published inference benchmarks
+are unchanged.
+
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `SACCADE_SOCKET` | `/tmp/saccade-lfm.sock` | Unix domain socket path between Rust `browse` and `saccade-engine`. |

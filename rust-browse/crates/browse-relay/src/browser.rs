@@ -162,6 +162,11 @@ impl Relay {
 
     /// The browser to open a tab in: the one named (waiting briefly while it reconnects), else the first connected.
     pub async fn link_for(self: &Arc<Self>, browser: Option<&str>) -> anyhow::Result<Arc<Link>> {
+        // Recover an offline paired profile before the existing disconnected-browser errors.
+        // Unknown explicitly named browsers retain their fast failure instead of opening Chrome.
+        if browser.is_none() {
+            self.ensure_browser_connected().await?;
+        }
         if let Some(name) = browser.map(str::trim).filter(|n| !n.is_empty()) {
             // A connected browser is answered without reading the token file.
             if let Some(link) = self.st().link_by_name(name).filter(|l| l.connected()) {
@@ -178,6 +183,9 @@ impl Relay {
                     let st = self.st();
                     st.known.values().any(|k| k.id == wanted || k.name.to_lowercase() == wanted)
                 };
+            if known && !self.st().connected() {
+                self.ensure_browser_connected().await?;
+            }
             let wait = if paired && self.age() < COLD_START_WAIT { self.cold_start_wait() } else { RECONNECT_WAIT };
             let found = known && self.wait_until(wait, |st| st.link_by_name(name).is_some_and(|l| l.connected())).await;
 

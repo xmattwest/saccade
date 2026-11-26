@@ -19,6 +19,7 @@ pub mod secrets;
 pub mod settings;
 pub mod surface;
 
+mod auto_launch;
 mod browser;
 mod cdp;
 mod demonstrate;
